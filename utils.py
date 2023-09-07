@@ -1,15 +1,19 @@
+from turtle import title
+
 import psycopg2
 import requests
+from numpy.core.defchararray import lower
+
 
 def create_database(database_name: str, params: dict) -> None:
     """Создание базы данных и таблиц для сохранения данных о компаниях и вакансиях."""
 
-    conn = psycopg2.connect(dbname='postgres', **params)
+    conn = psycopg2.connect(dbname=database_name, **params)
     conn.autocommit = True
     cur = conn.cursor()
 
-    cur.execute(f"DROP DATABASE {database_name}") #удалить БД
-    cur.execute(f"CREATE DATABASE {database_name}") #создать БД
+    # cur.execute(f"DROP DATABASE {database_name}")  # удалить БД
+    cur.execute(f"CREATE DATABASE {database_name}")  # создать БД
 
     conn.close()
 
@@ -41,22 +45,23 @@ def create_database(database_name: str, params: dict) -> None:
     conn.close()
 
 
-def save_data_to_database(list_company_vacancy: list[dict[str, any]], list_vacancy: list[dict[str, any]], database_name: str, params: dict):
-    """Сохранение данных о каналах и видео в базу данных."""
+def save_data_to_database(list_company_vacancy: list[dict[str, any]], list_vacancy: list[dict[str, any]],
+                          database_name: str, params: dict):
+    """Сохранение данных о компаниях и вакансиях. в базу данных."""
 
     conn = psycopg2.connect(dbname=database_name, **params)
 
     with conn.cursor() as cur:
         for company_vac in list_company_vacancy:
             cur.execute(
-            """
+                """
             INSERT INTO company (id_company, company, open_vacancies, url_vacancies)
             VALUES (%s, %s, %s, %s)
             RETURNING id_company
             """,
-            (company_vac['id_company'], company_vac['company'],
-            company_vac['open_vacancies'], company_vac['url_vacancies'])
-        )
+                (company_vac['id_company'], company_vac['company'],
+                 company_vac['open_vacancies'], company_vac['url_vacancies'])
+            )
         for vacancy_l in list_vacancy:
             cur.execute(
                 """
@@ -86,7 +91,8 @@ def save_data_to_database(list_company_vacancy: list[dict[str, any]], list_vacan
 class DBManager:
     """Создайте класс DBManager, который будет подключаться к БД PostgreSQL и иметь следующие методы:"""
 
-    def get_companies_and_vacancies_count(self, companies: list):
+    @staticmethod
+    def get_companies_and_vacancies_count(companies: list):
         """Получает список всех компаний и количество вакансий у каждой компании."""
         list_company_vacancy = []
         for company in companies:
@@ -106,7 +112,8 @@ class DBManager:
             })
         return list_company_vacancy
 
-    def get_all_vacancies(self, list_company_vacancy: list):
+    @staticmethod
+    def get_all_vacancies(list_company_vacancy: list):
         """Получает список всех вакансий с указанием названия компании, названия вакансии и зарплаты и ссылки на
         вакансию."""
         # как вывести более 20 вакансии? Как сделать пагинацию?
@@ -132,17 +139,49 @@ class DBManager:
                 list_vacancy_salary.append(vacancy_and_salary)
         return list_vacancy_salary
 
-    def get_avg_salary(self, list_vacancy_salary: list):
+    @staticmethod
+    def get_avg_salary(database_name: str, params: dict):
         """Получает среднюю зарплату по вакансиям."""
+        conn = psycopg2.connect(dbname=database_name, **params)
+        conn.autocommit = True
+        cur = conn.cursor()
 
-    pass
+        cur.execute(
+            """
+            SELECT AVG(salary) FROM vacancy;
+            """
+        )
+        conn.close()
 
-    def get_vacancies_with_higher_salary(self):
+    def get_vacancies_with_higher_salary(database_name: str, params: dict):
         """Получает список всех вакансий, у которых зарплата выше средней по всем вакансиям."""
 
-    pass
+        conn = psycopg2.connect(dbname=database_name, **params)
+        conn.autocommit = True
+        cur = conn.cursor()
 
-    def get_vacancies_with_keyword(self):
+        cur.execute(
+            """
+            SELECT id_vacancy, vacancy, salary FROM vacancy
+            WHERE salary > (SELECT ROUND(AVG(salary) ,2) FROM vacancy)
+            ORDER by salary
+            """
+        )
+        conn.close()
+
+    def get_vacancies_with_keyword(database_name: str, params: dict, text: str):
         """Получает список всех вакансий, в названии которых содержатся переданные в метод слова, например python."""
 
-    pass
+        conn = psycopg2.connect(dbname=database_name, **params)
+        conn.autocommit = True
+        cur = conn.cursor()
+        text1 = title(text)
+        text2 = lower(text)
+
+        cur.execute(
+            f"""
+            SELECT id_vacancy, vacancy, salary FROM vacancy
+            WHERE vacancy LIKE '%{text1}%' or LIKE '%{text2}%'
+            """
+        )
+        conn.close()

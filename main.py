@@ -1,13 +1,8 @@
-import json
-
-import requests
-
-from utils import DBManager, create_database, save_data_to_database
 from config import config
-
-
 # Список компаний
-from utils import DBManager
+from utils import DBManager, create_database, save_data_to_database
+
+
 companies_list = ['Lamoda tech', 'Альфа-Банк', 'TINKOFF', 'VK', 'X5 Tech', 'Совкомбанк ПАО ', 'Лига Цифровой Экономики',
                   'I Like IT', 'amoCRM', 'ООО ЛингуаЛео', 'Skyeng']
 #
@@ -18,20 +13,19 @@ list_company_vacancy = DBManager().get_companies_and_vacancies_count(companies_l
 #     print(f"Компания - {i['company']}, количество открытых вакансий - {i['open_vacancies']}")
 # #
 list_vacancy = DBManager().get_all_vacancies(list_company_vacancy)
-# print(list_vacancy)
-# # for i in list_vacancy:
-#     if i['salary'] == 0:
-#         i['salary'] = 'не указано'
-#     print(f"Компания - {i['company']}, вакансия - {i['vacancy']}, оплата - {i['salary']}, ссылка на вакансию - {i['url_vacancy']}")
+
+
+# print(list_vacancy) # for i in list_vacancy: if i['salary'] == 0: i['salary'] = 'не указано' print(f"Компания - {i[
+# 'company']}, вакансия - {i['vacancy']}, оплата - {i['salary']}, ссылка на вакансию - {i['url_vacancy']}")
 
 def main():
     params = config()
-    create_database('hh', params)
-    save_data_to_database(list_company_vacancy, list_vacancy, 'hh', params)
+    # create_database('hh', params)
+    # save_data_to_database(list_company_vacancy, list_vacancy, 'hh', params)
+    DBManager().get_avg_salary('hh', params)
 
 if __name__ == '__main__':
     main()
-
 
 # date = [{'company': list_company_vacancy}, {'vacancy': list_vacancy}]
 # save_data_to_database(date)
