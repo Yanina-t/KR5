@@ -7,12 +7,12 @@ companies_list = ['Lamoda tech', 'Альфа-Банк', 'TINKOFF', 'VK', 'X5 Tec
                   'I Like IT', 'amoCRM', 'ООО ЛингуаЛео', 'Skyeng']
 #
 # companies_list = ['X5 Tech']
-list_company_vacancy = DBManager().get_companies_and_vacancies_count(companies_list)
+# list_company_vacancy = DBManager().get_companies_and_vacancies_count(companies_list)
 # print(list_company_vacancy)
 # for i in list_company_vacancy:
 #     print(f"Компания - {i['company']}, количество открытых вакансий - {i['open_vacancies']}")
 # #
-list_vacancy = DBManager().get_all_vacancies(list_company_vacancy)
+# list_vacancy = DBManager().get_all_vacancies(list_company_vacancy)
 
 
 # print(list_vacancy) # for i in list_vacancy: if i['salary'] == 0: i['salary'] = 'не указано' print(f"Компания - {i[
@@ -22,7 +22,10 @@ def main():
     params = config()
     # create_database('hh', params)
     # save_data_to_database(list_company_vacancy, list_vacancy, 'hh', params)
-    DBManager().get_avg_salary('hh', params)
+    # DBManager().get_avg_salary('hh', params)
+    # DBManager().get_vacancies_with_higher_salary('hh', params)
+    text = input('Введите слово для поиска: ')
+    DBManager().get_vacancies_with_keyword('hh', params, text)
 
 if __name__ == '__main__':
     main()

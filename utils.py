@@ -120,7 +120,6 @@ class DBManager:
         list_vacancy_salary = []
         for i in list_company_vacancy:
             url = i['url_vacancies']
-            print(url)
             request = requests.get(url)
             js_company_vacancy = request.json()
             for vacancy in js_company_vacancy['items']:
@@ -148,11 +147,17 @@ class DBManager:
 
         cur.execute(
             """
-            SELECT AVG(salary) FROM vacancy;
+            SELECT ROUND(AVG(salary) ,2) FROM vacancy;
             """
         )
+        avg_salary = cur.fetchall()
+        for avg_s in avg_salary:
+            for a in avg_s:
+                print(a)
         conn.close()
+        cur.close()
 
+    @staticmethod
     def get_vacancies_with_higher_salary(database_name: str, params: dict):
         """Получает список всех вакансий, у которых зарплата выше средней по всем вакансиям."""
 
@@ -167,21 +172,32 @@ class DBManager:
             ORDER by salary
             """
         )
-        conn.close()
 
+        vacancies_with_higher_salary = cur.fetchall()
+        for vacancy_h_salary in vacancies_with_higher_salary:
+            print(vacancy_h_salary)
+        conn.close()
+        cur.close()
+
+    @staticmethod
     def get_vacancies_with_keyword(database_name: str, params: dict, text: str):
         """Получает список всех вакансий, в названии которых содержатся переданные в метод слова, например python."""
 
         conn = psycopg2.connect(dbname=database_name, **params)
         conn.autocommit = True
         cur = conn.cursor()
-        text1 = title(text)
+        text1 = text.title()
         text2 = lower(text)
 
         cur.execute(
             f"""
             SELECT id_vacancy, vacancy, salary FROM vacancy
-            WHERE vacancy LIKE '%{text1}%' or LIKE '%{text2}%'
+            WHERE vacancy LIKE '%{text1}%' or vacancy LIKE '%{text2}%'
             """
         )
+
+        vacancies_with_keyword = cur.fetchall()
+        for vacancy_keyword in vacancies_with_keyword:
+            print(vacancy_keyword)
         conn.close()
+        cur.close()
