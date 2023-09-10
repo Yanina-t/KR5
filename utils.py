@@ -1,7 +1,5 @@
-from turtle import title
-
-import psycopg2
 import requests
+import psycopg2
 from numpy.core.defchararray import lower
 
 
@@ -21,17 +19,17 @@ def create_database(database_name: str, params: dict) -> None:
 
     with conn.cursor() as cur:
         cur.execute("""
-        CREATE TABLE company (
+        CREATE TABLE companies (
                 id_company INTEGER PRIMARY KEY,
                 company VARCHAR(255) NOT NULL,
                 open_vacancies INTEGER,
-                url_vacancies TEXT
+                vacancies_url TEXT
                 )
             """)
 
     with conn.cursor() as cur:
         cur.execute("""
-                CREATE TABLE vacancy (
+                CREATE TABLE vacancies (
                     id_company INT REFERENCES company(id_company) ,
                     company VARCHAR(100) NOT NULL,
                     id_vacancy SERIAL PRIMARY KEY,
@@ -45,159 +43,145 @@ def create_database(database_name: str, params: dict) -> None:
     conn.close()
 
 
-def save_data_to_database(list_company_vacancy: list[dict[str, any]], list_vacancy: list[dict[str, any]],
+def get_companies(companies: list):
+    """Получение данных о компаниях"""
+    list_company_vacancy = []
+    for company in companies:
+        payload = {
+            'text': company,
+            'only_with_vacancies': True,
+            'per_page': 50,
+        }
+        url = 'https://api.hh.ru/employers'
+        request = requests.get(url, payload)
+        js_data = request.json()
+        list_company_vacancy.append({
+            'company': js_data['items'][0]['name'],
+            'id_company': js_data['items'][0]['id'],
+            'open_vacancies': js_data['items'][0]['open_vacancies'],
+            'url_vacancies': js_data['items'][0]['vacancies_url']
+        })
+    return list_company_vacancy
+
+
+def get_vacancies(list_company_vacancy: list):
+    """Получение данных о вакансиях """
+    # как вывести более 20 вакансии? Как сделать пагинацию?
+    list_vacancy_salary = []
+    page = 0
+    payload = {
+        'page': page,
+        'per_page': 50,
+    }
+    for i in list_company_vacancy:
+        url = i['url_vacancies']
+        request = requests.get(url, payload)
+        js_company_vacancy = request.json()
+        for vacancy in js_company_vacancy['items']:
+            vacancy_and_salary = {
+                'company': vacancy['employer']['name'],
+                'id_company': vacancy['employer']['id'],
+                'vacancy': vacancy['name'],
+                'id_vacancy': vacancy['id'],
+                'url_vacancy': vacancy['alternate_url'],
+            }
+            if vacancy['salary'] is not None:
+                vacancy_and_salary['salary'] = 0 if vacancy.get('salary').get('from') is None else vacancy.get(
+                    'salary').get('from')
+            else:
+                vacancy_and_salary['salary'] = 0
+            list_vacancy_salary.append(vacancy_and_salary)
+            page += 1
+    return list_vacancy_salary
+
+
+def save_data_to_database(list_company: list[dict[str, any]], list_vacancy: list[dict[str, any]],
                           database_name: str, params: dict):
-    """Сохранение данных о компаниях и вакансиях. в базу данных."""
+    """Сохранение данных о компаниях и вакансиях, в базу данных."""
 
     conn = psycopg2.connect(dbname=database_name, **params)
 
     with conn.cursor() as cur:
-        for company_vac in list_company_vacancy:
+        for company_vac in list_company:
             cur.execute(
                 """
-            INSERT INTO company (id_company, company, open_vacancies, url_vacancies)
+            INSERT INTO companies (id_company, company, open_vacancies, url_vacancies)
             VALUES (%s, %s, %s, %s)
             RETURNING id_company
             """,
                 (company_vac['id_company'], company_vac['company'],
-                 company_vac['open_vacancies'], company_vac['url_vacancies'])
+                 company_vac['open_vacancies'], company_vac['vacancies_url'])
             )
         for vacancy_l in list_vacancy:
             cur.execute(
                 """
-                INSERT INTO vacancy (id_company, company, id_vacancy, vacancy, salary, url_vacancy)
+                INSERT INTO vacancies (id_company, company, id_vacancy, vacancy, salary, url_vacancy)
                 VALUES (%s, %s, %s, %s, %s, %s)
                 RETURNING id_company
                 """,
                 (vacancy_l['id_company'], vacancy_l['company'], vacancy_l['id_vacancy'], vacancy_l['vacancy'],
                  vacancy_l['salary'], vacancy_l['url_vacancy'])
             )
-            # id_company = cur.fetchone()[0]
-            # videos_data = channel['videos']
-            # for video in videos_data:
-            #     video_data = video['snippet']
-            #     cur.execute(
-            #         """
-            #         INSERT INTO videos (channel_id, title, publish_date, video_url)
-            #         VALUES (%s, %s, %s, %s)
-            #         """,
-            #         (channel_id, video_data['title'], video_data['publishedAt'],
-            #          f"https://www.youtube.com/watch?v={video['id']['videoId']}")
-            #     )
-    conn.commit()
-    conn.close()
 
 
 class DBManager:
     """Создайте класс DBManager, который будет подключаться к БД PostgreSQL и иметь следующие методы:"""
 
-    @staticmethod
-    def get_companies_and_vacancies_count(companies: list):
-        """Получает список всех компаний и количество вакансий у каждой компании."""
-        list_company_vacancy = []
-        for company in companies:
-            payload = {
-                'text': company,
-                'only_with_vacancies': True,
-                'per_page': 50,
-            }
-            url = 'https://api.hh.ru/employers'
-            request = requests.get(url, payload)
-            js_data = request.json()
-            list_company_vacancy.append({
-                'company': js_data['items'][0]['name'],
-                'id_company': js_data['items'][0]['id'],
-                'open_vacancies': js_data['items'][0]['open_vacancies'],
-                'url_vacancies': js_data['items'][0]['vacancies_url']
-            })
-        return list_company_vacancy
+    def __init__(self, database_name: str, params: dict):
+        self.conn = psycopg2.connect(dbname=database_name, **params)
+        self.conn.autocommit = True
+        self.cur = self.conn.cursor()
 
-    @staticmethod
-    def get_all_vacancies(list_company_vacancy: list):
+    def get_companies_and_vacancies_count(self):
+        """Получает список всех компаний и количество вакансий у каждой компании."""
+        query = """
+                SELECT companies.company, COUNT(vacancies.id_company) AS vacancy_count
+                FROM companies
+                LEFT JOIN vacancies ON companies.id_company = vacancies.id_company
+                GROUP BY companies.company
+                """
+        self.cur.execute(query)
+        return self.cur.fetchall()
+
+    def get_all_vacancies(self):
         """Получает список всех вакансий с указанием названия компании, названия вакансии и зарплаты и ссылки на
         вакансию."""
-        # как вывести более 20 вакансии? Как сделать пагинацию?
-        list_vacancy_salary = []
-        for i in list_company_vacancy:
-            url = i['url_vacancies']
-            request = requests.get(url)
-            js_company_vacancy = request.json()
-            for vacancy in js_company_vacancy['items']:
-                vacancy_and_salary = {
-                    'company': vacancy['employer']['name'],
-                    'id_company': vacancy['employer']['id'],
-                    'vacancy': vacancy['name'],
-                    'id_vacancy': vacancy['id'],
-                    'url_vacancy': vacancy['alternate_url'],
-                }
-                if vacancy['salary'] is not None:
-                    vacancy_and_salary['salary'] = 0 if vacancy.get('salary').get('from') is None else vacancy.get(
-                        'salary').get('from')
-                else:
-                    vacancy_and_salary['salary'] = 0
-                list_vacancy_salary.append(vacancy_and_salary)
-        return list_vacancy_salary
+        query = """
+                SELECT companies.company, vacancies.vacancy, vacancies.salary, vacancies.url_vacancy
+                FROM companies
+                JOIN vacancies ON companies.id_company = vacancies.id_company
+                """
+        self.cur.execute(query)
+        return self.cur.fetchall()
 
-    @staticmethod
-    def get_avg_salary(database_name: str, params: dict):
+    def get_avg_salary(self):
         """Получает среднюю зарплату по вакансиям."""
-        conn = psycopg2.connect(dbname=database_name, **params)
-        conn.autocommit = True
-        cur = conn.cursor()
+        query = "SELECT ROUND(AVG(salary) ,2) FROM vacancies;"
+        self.cur.execute(query)
+        return self.cur.fetchone()[0]
 
-        cur.execute(
-            """
-            SELECT ROUND(AVG(salary) ,2) FROM vacancy;
-            """
-        )
-        avg_salary = cur.fetchall()
-        for avg_s in avg_salary:
-            for a in avg_s:
-                print(a)
-        conn.close()
-        cur.close()
-
-    @staticmethod
-    def get_vacancies_with_higher_salary(database_name: str, params: dict):
+    def get_vacancies_with_higher_salary(self):
         """Получает список всех вакансий, у которых зарплата выше средней по всем вакансиям."""
-
-        conn = psycopg2.connect(dbname=database_name, **params)
-        conn.autocommit = True
-        cur = conn.cursor()
-
-        cur.execute(
-            """
-            SELECT id_vacancy, vacancy, salary FROM vacancy
+        query = """
+            SELECT id_vacancy, vacancy, salary FROM vacancies
             WHERE salary > (SELECT ROUND(AVG(salary) ,2) FROM vacancy)
             ORDER by salary
             """
-        )
+        self.cur.execute(query)
+        return self.cur.fetchall()
 
-        vacancies_with_higher_salary = cur.fetchall()
-        for vacancy_h_salary in vacancies_with_higher_salary:
-            print(vacancy_h_salary)
-        conn.close()
-        cur.close()
-
-    @staticmethod
-    def get_vacancies_with_keyword(database_name: str, params: dict, text: str):
+    def get_vacancies_with_keyword(self, text):
         """Получает список всех вакансий, в названии которых содержатся переданные в метод слова, например python."""
-
-        conn = psycopg2.connect(dbname=database_name, **params)
-        conn.autocommit = True
-        cur = conn.cursor()
         text1 = text.title()
         text2 = lower(text)
-
-        cur.execute(
+        self.cur.execute(
             f"""
             SELECT id_vacancy, vacancy, salary FROM vacancy
             WHERE vacancy LIKE '%{text1}%' or vacancy LIKE '%{text2}%'
             """
         )
+        return self.cur.fetchall()
 
-        vacancies_with_keyword = cur.fetchall()
-        for vacancy_keyword in vacancies_with_keyword:
-            print(vacancy_keyword)
-        conn.close()
-        cur.close()
+    def close(self):
+        self.cur.close()
+        self.conn.close()

@@ -1,53 +1,34 @@
 from config import config
-# Список компаний
-from utils import DBManager, create_database, save_data_to_database
-
+from utils import create_database, get_companies, get_vacancies, save_data_to_database, DBManager
 
 companies_list = ['Lamoda tech', 'Альфа-Банк', 'TINKOFF', 'VK', 'X5 Tech', 'Совкомбанк ПАО ', 'Лига Цифровой Экономики',
                   'I Like IT', 'amoCRM', 'ООО ЛингуаЛео', 'Skyeng']
-#
-# companies_list = ['X5 Tech']
-# list_company_vacancy = DBManager().get_companies_and_vacancies_count(companies_list)
-# print(list_company_vacancy)
-# for i in list_company_vacancy:
-#     print(f"Компания - {i['company']}, количество открытых вакансий - {i['open_vacancies']}")
-# #
-# list_vacancy = DBManager().get_all_vacancies(list_company_vacancy)
 
+params = config()
+database_name = 'hh'
+create_database(database_name, params)  # создание БД и таблиц
+list_company = get_companies(companies_list)  # получение данных о компаниях
+list_vacancy = get_vacancies(companies_list)  # получение данных о вакансиях
+save_data_to_database(list_company, list_vacancy, database_name, params)  # сохранение данных в БД
 
-# print(list_vacancy) # for i in list_vacancy: if i['salary'] == 0: i['salary'] = 'не указано' print(f"Компания - {i[
-# 'company']}, вакансия - {i['vacancy']}, оплата - {i['salary']}, ссылка на вакансию - {i['url_vacancy']}")
 
 def main():
-    params = config()
-    # create_database('hh', params)
-    # save_data_to_database(list_company_vacancy, list_vacancy, 'hh', params)
-    # DBManager().get_avg_salary('hh', params)
-    # DBManager().get_vacancies_with_higher_salary('hh', params)
-    text = input('Введите слово для поиска: ')
-    DBManager().get_vacancies_with_keyword('hh', params, text)
+    db_manager = DBManager(database_name, params)
+    print(db_manager.get_companies_and_vacancies_count())
+    print(db_manager.get_all_vacancies())
+    print(db_manager.get_avg_salary())
 
-if __name__ == '__main__':
+    keyword = input("Введите ключевое слово для поиска вакансий: ")
+    vacancies = db_manager.get_vacancies_with_keyword(keyword)
+    if vacancies:
+        print(f"Вакансии, содержащие ключевое слово '{keyword}':")
+        for vacancy in vacancies:
+            print(vacancy)
+    else:
+        print(f"Вакансии с ключевым словом '{keyword}' не найдены.")
+
+    db_manager.close()
+
+
+if __name__ == "__main__":
     main()
-
-# date = [{'company': list_company_vacancy}, {'vacancy': list_vacancy}]
-# save_data_to_database(date)
-# print(date)
-
-# list_company_vacancy = []
-# for company in companies_list:
-#     payload = {
-#         'text': company,
-#         'only_with_vacancies': True,
-#         'per_page': 100,
-#     }
-#     url = 'https://api.hh.ru/employers'
-#     request = requests.get(url, payload)
-#     js_data = request.json()
-#     list_company_vacancy.append({
-#         'company': js_data['items'][0]['name'],
-#         'id_company': js_data['items'][0]['id'],
-#         'open_vacancies': js_data['items'][0]['open_vacancies'],
-#     })
-#     print(js_data)
-# print(list_company_vacancy)
