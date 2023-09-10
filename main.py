@@ -4,15 +4,16 @@ from utils import create_database, get_companies, get_vacancies, save_data_to_da
 companies_list = ['Lamoda tech', 'Альфа-Банк', 'TINKOFF', 'VK', 'X5 Tech', 'Совкомбанк ПАО ', 'Лига Цифровой Экономики',
                   'I Like IT', 'amoCRM', 'ООО ЛингуаЛео', 'Skyeng']
 
-params = config()
-database_name = 'hh'
-create_database(database_name, params)  # создание БД и таблиц
-list_company = get_companies(companies_list)  # получение данных о компаниях
-list_vacancy = get_vacancies(companies_list)  # получение данных о вакансиях
-save_data_to_database(list_company, list_vacancy, database_name, params)  # сохранение данных в БД
 
 
 def main():
+    params = config()
+    database_name = 'hh'
+    create_database(database_name, params)  # создание БД и таблиц
+    list_company = get_companies(companies_list)  # получение данных о компаниях
+    list_vacancy = get_vacancies(companies_list)  # получение данных о вакансиях
+    save_data_to_database(list_company, list_vacancy, database_name, params)  # сохранение данных в БД
+
     db_manager = DBManager(database_name, params)
     print(db_manager.get_companies_and_vacancies_count())
     print(db_manager.get_all_vacancies())
