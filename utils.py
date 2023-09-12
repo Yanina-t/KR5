@@ -6,11 +6,11 @@ from numpy.core.defchararray import lower
 def create_database(database_name: str, params: dict) -> None:
     """Создание базы данных и таблиц для сохранения данных о компаниях и вакансиях."""
 
-    conn = psycopg2.connect(dbname=database_name, **params)
+    conn = psycopg2.connect(dbname='postgres', **params)
     conn.autocommit = True
     cur = conn.cursor()
 
-    # cur.execute(f"DROP DATABASE {database_name}")  # удалить БД
+    cur.execute(f"DROP DATABASE {database_name}")  # удалить БД
     cur.execute(f"CREATE DATABASE {database_name}")  # создать БД
 
     conn.close()
@@ -23,16 +23,17 @@ def create_database(database_name: str, params: dict) -> None:
                 id_company INTEGER PRIMARY KEY,
                 company VARCHAR(255) NOT NULL,
                 open_vacancies INTEGER,
-                vacancies_url TEXT
+                url_vacancies TEXT
                 )
             """)
 
     with conn.cursor() as cur:
         cur.execute("""
                 CREATE TABLE vacancies (
-                    id_company INT REFERENCES company(id_company) ,
-                    company VARCHAR(100) NOT NULL,
+                    id_company INT REFERENCES companies(id_company),
                     id_vacancy SERIAL PRIMARY KEY,
+                    company VARCHAR(100) NOT NULL,
+                    id_vacancy_in_company TEXT, 
                     vacancy VARCHAR(100) NOT NULL,
                     salary INT NOT NULL,
                     url_vacancy TEXT
@@ -69,30 +70,42 @@ def get_vacancies(list_company_vacancy: list):
     # как вывести более 20 вакансии? Как сделать пагинацию?
     list_vacancy_salary = []
     page = 0
-    payload = {
-        'page': page,
-        'per_page': 50,
-    }
     for i in list_company_vacancy:
+        payload = {
+            'page': page,
+            'per_page': 50,
+        }
         url = i['url_vacancies']
-        request = requests.get(url, payload)
-        js_company_vacancy = request.json()
-        for vacancy in js_company_vacancy['items']:
-            vacancy_and_salary = {
-                'company': vacancy['employer']['name'],
-                'id_company': vacancy['employer']['id'],
-                'vacancy': vacancy['name'],
-                'id_vacancy': vacancy['id'],
-                'url_vacancy': vacancy['alternate_url'],
-            }
-            if vacancy['salary'] is not None:
-                vacancy_and_salary['salary'] = 0 if vacancy.get('salary').get('from') is None else vacancy.get(
-                    'salary').get('from')
-            else:
-                vacancy_and_salary['salary'] = 0
-            list_vacancy_salary.append(vacancy_and_salary)
+        while True:
+            request = requests.get(url, params=payload)
+            js_company_vacancy = request.json()
+
+            # Проверяем, есть ли вакансии в текущем ответе
+            vacancies = js_company_vacancy.get('items', [])
+            if not vacancies:
+                break
+
+            for vacancy in vacancies:
+                vacancy_and_salary = {
+                    'company': vacancy['employer']['name'],
+                    'id_company': vacancy['employer']['id'],
+                    'vacancy': vacancy['name'],
+                    'id_vacancy': vacancy['id'],
+                    'url_vacancy': vacancy['alternate_url'],
+                }
+
+                if vacancy['salary'] is not None:
+                    vacancy_and_salary['salary'] = 0 if vacancy['salary'].get('from') is None else vacancy[
+                        'salary'].get('from')
+                else:
+                    vacancy_and_salary['salary'] = 0
+
+                list_vacancy_salary.append(vacancy_and_salary)
+
+            # Увеличиваем номер страницы для пагинации
             page += 1
-    return list_vacancy_salary
+
+        return list_vacancy_salary
 
 
 def save_data_to_database(list_company: list[dict[str, any]], list_vacancy: list[dict[str, any]],
@@ -110,12 +123,12 @@ def save_data_to_database(list_company: list[dict[str, any]], list_vacancy: list
             RETURNING id_company
             """,
                 (company_vac['id_company'], company_vac['company'],
-                 company_vac['open_vacancies'], company_vac['vacancies_url'])
+                 company_vac['open_vacancies'], company_vac['url_vacancies'])
             )
         for vacancy_l in list_vacancy:
             cur.execute(
                 """
-                INSERT INTO vacancies (id_company, company, id_vacancy, vacancy, salary, url_vacancy)
+                INSERT INTO vacancies (id_company, company, id_vacancy_in_company, vacancy, salary, url_vacancy)
                 VALUES (%s, %s, %s, %s, %s, %s)
                 RETURNING id_company
                 """,
@@ -176,7 +189,7 @@ class DBManager:
         text2 = lower(text)
         self.cur.execute(
             f"""
-            SELECT id_vacancy, vacancy, salary FROM vacancy
+            SELECT id_vacancy, vacancy, salary FROM vacancies
             WHERE vacancy LIKE '%{text1}%' or vacancy LIKE '%{text2}%'
             """
         )

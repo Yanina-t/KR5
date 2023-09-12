@@ -5,13 +5,12 @@ companies_list = ['Lamoda tech', 'Альфа-Банк', 'TINKOFF', 'VK', 'X5 Tec
                   'I Like IT', 'amoCRM', 'ООО ЛингуаЛео', 'Skyeng']
 
 
-
 def main():
     params = config()
     database_name = 'hh'
     create_database(database_name, params)  # создание БД и таблиц
     list_company = get_companies(companies_list)  # получение данных о компаниях
-    list_vacancy = get_vacancies(companies_list)  # получение данных о вакансиях
+    list_vacancy = get_vacancies(list_company)  # получение данных о вакансиях
     save_data_to_database(list_company, list_vacancy, database_name, params)  # сохранение данных в БД
 
     db_manager = DBManager(database_name, params)
