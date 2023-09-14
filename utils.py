@@ -10,7 +10,7 @@ def create_database(database_name: str, params: dict) -> None:
     conn.autocommit = True
     cur = conn.cursor()
 
-    cur.execute(f"DROP DATABASE {database_name}")  # удалить БД
+    cur.execute(f"DROP DATABASE IF EXISTS {database_name}")  # удалить БД
     cur.execute(f"CREATE DATABASE {database_name}")  # создать БД
 
     conn.close()
@@ -116,25 +116,16 @@ def save_data_to_database(list_company: list[dict[str, any]], list_vacancy: list
 
     with conn.cursor() as cur:
         for company_vac in list_company:
-            cur.execute(
-                """
-            INSERT INTO companies (id_company, company, open_vacancies, url_vacancies)
-            VALUES (%s, %s, %s, %s)
-            RETURNING id_company
-            """,
-                (company_vac['id_company'], company_vac['company'],
-                 company_vac['open_vacancies'], company_vac['url_vacancies'])
-            )
+            query = "INSERT INTO companies (id_company, company, open_vacancies, url_vacancies) VALUES (%s, %s, %s, %s)"
+            cur.execute(query, (company_vac['id_company'], company_vac['company'], company_vac['open_vacancies'],
+                                company_vac['url_vacancies']))
         for vacancy_l in list_vacancy:
-            cur.execute(
-                """
-                INSERT INTO vacancies (id_company, company, id_vacancy_in_company, vacancy, salary, url_vacancy)
-                VALUES (%s, %s, %s, %s, %s, %s)
-                RETURNING id_company
-                """,
-                (vacancy_l['id_company'], vacancy_l['company'], vacancy_l['id_vacancy'], vacancy_l['vacancy'],
-                 vacancy_l['salary'], vacancy_l['url_vacancy'])
-            )
+            query = ("INSERT INTO vacancies (id_company, company, id_vacancy_in_company, vacancy, salary, url_vacancy) "
+                     "VALUES (%s, %s, %s, %s, %s, %s)")
+            cur.execute(query, (
+                vacancy_l['id_company'], vacancy_l['company'], vacancy_l['id_vacancy'], vacancy_l['vacancy'],
+                vacancy_l['salary'], vacancy_l['url_vacancy']))
+            conn.commit()
 
 
 class DBManager:
@@ -148,7 +139,7 @@ class DBManager:
     def get_companies_and_vacancies_count(self):
         """Получает список всех компаний и количество вакансий у каждой компании."""
         query = """
-                SELECT companies.company, COUNT(vacancies.id_company) AS vacancy_count
+                SELECT companies.company, COUNT(vacancies.id_vacancy) AS vacancy_count
                 FROM companies
                 LEFT JOIN vacancies ON companies.id_company = vacancies.id_company
                 GROUP BY companies.company
