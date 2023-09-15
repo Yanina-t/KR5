@@ -69,8 +69,9 @@ def get_vacancies(list_company_vacancy: list):
     """Получение данных о вакансиях """
     # как вывести более 20 вакансии? Как сделать пагинацию?
     list_vacancy_salary = []
-    page = 0
     for i in list_company_vacancy:
+        company_vacancies = []
+        page = 0
         payload = {
             'page': page,
             'per_page': 50,
@@ -82,9 +83,10 @@ def get_vacancies(list_company_vacancy: list):
 
             # Проверяем, есть ли вакансии в текущем ответе
             vacancies = js_company_vacancy.get('items', [])
-            if not vacancies:
+            if not vacancies:  # Если вакансий нет на текущей странице, выходим из цикла while и не получается переход в for i in list_company_vacancy:
                 break
 
+            # Обработка вакансий текущей страницы
             for vacancy in vacancies:
                 vacancy_and_salary = {
                     'company': vacancy['employer']['name'],
@@ -99,13 +101,12 @@ def get_vacancies(list_company_vacancy: list):
                         'salary'].get('from')
                 else:
                     vacancy_and_salary['salary'] = 0
-
-                list_vacancy_salary.append(vacancy_and_salary)
-
+                company_vacancies.append(vacancy_and_salary)
             # Увеличиваем номер страницы для пагинации
             page += 1
 
-        return list_vacancy_salary
+        list_vacancy_salary.extend(company_vacancies)
+    return list_vacancy_salary
 
 
 def save_data_to_database(list_company: list[dict[str, any]], list_vacancy: list[dict[str, any]],
