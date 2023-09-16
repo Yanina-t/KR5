@@ -5,7 +5,7 @@ companies_list = ['Lamoda tech', 'Альфа-Банк', 'TINKOFF', 'VK', 'X5 Tec
                   'I Like IT', 'amoCRM', 'ООО ЛингуаЛео', 'Skyeng']
 
 
-def main():
+def main():                             
     params = config()
     database_name = 'hh'
     create_database(database_name, params)  # создание БД и таблиц

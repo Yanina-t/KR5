@@ -99,11 +99,16 @@ def get_vacancies(list_company_vacancy: list):
                             'url_vacancy': vacancy['alternate_url'],
                             'salary': vacancy['salary']['from'] if vacancy.get('salary') else 0
                         }
+                        if vacancy['salary'] is not None:
+                            vacancy_and_salary['salary'] = 0 if vacancy['salary'].get('from') is None else vacancy[
+                                'salary'].get('from')
+                        else:
+                            vacancy_and_salary['salary'] = 0
                         company_vacancies.append(vacancy_and_salary)
-                time.sleep(20)
+                time.sleep(2)
             break
         list_vacancy_salary.extend(company_vacancies)
-        time.sleep(20)
+        time.sleep(2)
     return list_vacancy_salary
 
 
