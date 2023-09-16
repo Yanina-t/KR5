@@ -1,3 +1,6 @@
+import time
+from datetime import datetime
+
 import requests
 import psycopg2
 from numpy.core.defchararray import lower
@@ -69,43 +72,38 @@ def get_vacancies(list_company_vacancy: list):
     """Получение данных о вакансиях """
     # как вывести более 20 вакансии? Как сделать пагинацию?
     list_vacancy_salary = []
-    for i in list_company_vacancy:
+    for company in list_company_vacancy:
         company_vacancies = []
-        page = 0
-        payload = {
-            'page': page,
-            'per_page': 50,
-        }
-        url = i['url_vacancies']
+        url = company['url_vacancies']
         while True:
-            request = requests.get(url, params=payload)
-            js_company_vacancy = request.json()
+            response = requests.get(url)
+            js_company_vacancy = response.json()
 
-            # Проверяем, есть ли вакансии в текущем ответе
-            vacancies = js_company_vacancy.get('items', [])
-            if not vacancies:  # Если вакансий нет на текущей странице, выходим из цикла while и не получается переход в for i in list_company_vacancy:
-                break
+            pages = js_company_vacancy['pages']
+            for page in range(pages):
 
-            # Обработка вакансий текущей страницы
-            for vacancy in vacancies:
-                vacancy_and_salary = {
-                    'company': vacancy['employer']['name'],
-                    'id_company': vacancy['employer']['id'],
-                    'vacancy': vacancy['name'],
-                    'id_vacancy': vacancy['id'],
-                    'url_vacancy': vacancy['alternate_url'],
-                }
+                response = requests.get(url, params={'page': page + 1, 'per_page': 100})
 
-                if vacancy['salary'] is not None:
-                    vacancy_and_salary['salary'] = 0 if vacancy['salary'].get('from') is None else vacancy[
-                        'salary'].get('from')
+                vacancies = response.json()
+
+                if vacancies.get('items', None) is None or len(vacancies['items']) == 0:
+                    continue
                 else:
-                    vacancy_and_salary['salary'] = 0
-                company_vacancies.append(vacancy_and_salary)
-            # Увеличиваем номер страницы для пагинации
-            page += 1
-
+                    vacancies_items = vacancies['items']
+                    for vacancy in vacancies_items:
+                        vacancy_and_salary = {
+                            'company': vacancy['employer']['name'],
+                            'id_company': vacancy['employer']['id'],
+                            'vacancy': vacancy['name'],
+                            'id_vacancy': vacancy['id'],
+                            'url_vacancy': vacancy['alternate_url'],
+                            'salary': vacancy['salary']['from'] if vacancy.get('salary') else 0
+                        }
+                        company_vacancies.append(vacancy_and_salary)
+                time.sleep(20)
+            break
         list_vacancy_salary.extend(company_vacancies)
+        time.sleep(20)
     return list_vacancy_salary
 
 
