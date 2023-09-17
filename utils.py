@@ -1,6 +1,4 @@
 import time
-from datetime import datetime
-
 import requests
 import psycopg2
 from numpy.core.defchararray import lower
@@ -47,89 +45,79 @@ def create_database(database_name: str, params: dict) -> None:
     conn.close()
 
 
-def get_companies(companies: list):
+def get_companies(company: str):
     """Получение данных о компаниях"""
-    list_company_vacancy = []
-    for company in companies:
-        payload = {
-            'text': company,
-            'only_with_vacancies': True,
-            'per_page': 50,
-        }
-        url = 'https://api.hh.ru/employers'
-        request = requests.get(url, payload)
-        js_data = request.json()
-        list_company_vacancy.append({
-            'company': js_data['items'][0]['name'],
-            'id_company': js_data['items'][0]['id'],
-            'open_vacancies': js_data['items'][0]['open_vacancies'],
-            'url_vacancies': js_data['items'][0]['vacancies_url']
-        })
-    return list_company_vacancy
+    payload = {
+        'text': company,
+        'only_with_vacancies': True,
+        'per_page': 50,
+    }
+    url = 'https://api.hh.ru/employers'
+    request = requests.get(url, payload)
+    js_data = request.json()
+    return {
+        'company': js_data['items'][0]['name'],
+        'id_company': js_data['items'][0]['id'],
+        'open_vacancies': js_data['items'][0]['open_vacancies'],
+        'url_vacancies': js_data['items'][0]['vacancies_url']
+    }
 
 
-def get_vacancies(list_company_vacancy: list):
+def get_vacancies(company_vacancies: str):
     """Получение данных о вакансиях """
     # как вывести более 20 вакансии? Как сделать пагинацию?
     list_vacancy_salary = []
-    for company in list_company_vacancy:
-        company_vacancies = []
-        url = company['url_vacancies']
-        while True:
-            response = requests.get(url)
-            js_company_vacancy = response.json()
+    response = requests.get(company_vacancies)
+    js_company_vacancy = response.json()
+    pages = js_company_vacancy['pages']
+    while True:
+        for page in range(pages):
 
-            pages = js_company_vacancy['pages']
-            for page in range(pages):
+            response = requests.get(company_vacancies, params={'page': page + 1})
 
-                response = requests.get(url, params={'page': page + 1, 'per_page': 100})
+            vacancies = response.json()
 
-                vacancies = response.json()
-
-                if vacancies.get('items', None) is None or len(vacancies['items']) == 0:
-                    continue
-                else:
-                    vacancies_items = vacancies['items']
-                    for vacancy in vacancies_items:
-                        vacancy_and_salary = {
-                            'company': vacancy['employer']['name'],
-                            'id_company': vacancy['employer']['id'],
-                            'vacancy': vacancy['name'],
-                            'id_vacancy': vacancy['id'],
-                            'url_vacancy': vacancy['alternate_url'],
-                            'salary': vacancy['salary']['from'] if vacancy.get('salary') else 0
-                        }
-                        if vacancy['salary'] is not None:
-                            vacancy_and_salary['salary'] = 0 if vacancy['salary'].get('from') is None else vacancy[
-                                'salary'].get('from')
-                        else:
-                            vacancy_and_salary['salary'] = 0
-                        company_vacancies.append(vacancy_and_salary)
-                time.sleep(2)
-            break
-        list_vacancy_salary.extend(company_vacancies)
-        time.sleep(2)
+            if vacancies.get('items', None) is None or len(vacancies['items']) == 0:
+                continue
+            else:
+                vacancies_items = vacancies['items']
+                for vacancy in vacancies_items:
+                    vacancy_and_salary = {
+                        'company': vacancy['employer']['name'],
+                        'id_company': vacancy['employer']['id'],
+                        'vacancy': vacancy['name'],
+                        'id_vacancy': vacancy['id'],
+                        'url_vacancy': vacancy['alternate_url'],
+                        'salary': vacancy['salary']['from'] if vacancy.get('salary') else 0
+                    }
+                    if vacancy['salary'] is not None:
+                        vacancy_and_salary['salary'] = 0 if vacancy['salary'].get('from') is None else vacancy[
+                            'salary'].get('from')
+                    else:
+                        vacancy_and_salary['salary'] = 0
+                    list_vacancy_salary.append(vacancy_and_salary)
+            time.sleep(10)
+        break
     return list_vacancy_salary
 
 
-def save_data_to_database(list_company: list[dict[str, any]], list_vacancy: list[dict[str, any]],
+def save_data_to_database(company: dict[str, str], list_vacancy: list[dict[str, any]],
                           database_name: str, params: dict):
     """Сохранение данных о компаниях и вакансиях, в базу данных."""
 
     conn = psycopg2.connect(dbname=database_name, **params)
 
     with conn.cursor() as cur:
-        for company_vac in list_company:
-            query = "INSERT INTO companies (id_company, company, open_vacancies, url_vacancies) VALUES (%s, %s, %s, %s)"
-            cur.execute(query, (company_vac['id_company'], company_vac['company'], company_vac['open_vacancies'],
-                                company_vac['url_vacancies']))
+        query = "INSERT INTO companies (id_company, company, open_vacancies, url_vacancies) VALUES (%s, %s, %s, %s)"
+        cur.execute(query, (company['id_company'], company['company'], company['open_vacancies'],
+                            company['url_vacancies']))
         for vacancy_l in list_vacancy:
             query = ("INSERT INTO vacancies (id_company, company, id_vacancy_in_company, vacancy, salary, url_vacancy) "
                      "VALUES (%s, %s, %s, %s, %s, %s)")
             cur.execute(query, (
                 vacancy_l['id_company'], vacancy_l['company'], vacancy_l['id_vacancy'], vacancy_l['vacancy'],
                 vacancy_l['salary'], vacancy_l['url_vacancy']))
-            conn.commit()
+        conn.commit()
 
 
 class DBManager:
