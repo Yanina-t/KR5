@@ -1,0 +1,5 @@
+pip~=23.1.2
+setuptools~=65.5.0
+requests~=2.31.0
+psycopg2~=2.9.7
+numpy~=1.25.2

@@ -73,7 +73,7 @@ def get_vacancies(company_vacancies: str):
     while True:
         for page in range(pages):
 
-            response = requests.get(company_vacancies, params={'page': page + 1})
+            response = requests.get(company_vacancies, params={'page': page})
 
             vacancies = response.json()
 
